@@ -22,6 +22,7 @@ enum OpeningResult { O_UNSUCCESS, O_SUCCESS, O_EXPLOSION };
 FILE *gLog;
 
 const int kKeyEscape = 'q';
+const int kKeyRestart = 'r';
 const int kCellColorPairID[10] = {12, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 const char kCellChar[10] = {' ', '1', '2', '3', '4', '5', '6', '7', '8', '*'};
 const int kCellStateColorPairID[3] = {10, 11, 12};
@@ -31,9 +32,10 @@ class SapperField {
     CellInfo **field_info;
     CellState **field_state;
     int field_width, field_height;
+    int flags_amount, bombs_amount;
 
 public:
-    SapperField(int width, int height, int bombs_amount);
+    SapperField(int width, int height, int bombs_number);
     ~SapperField();
 
     OpeningResult OpenCell(int x, int y);
@@ -41,19 +43,22 @@ public:
 
     void DrawCell(int x, int y) const;
     void DrawCellState(int x, int y) const;
+    void DrawAllBombs() const;
     CellInfo GetCellInfo(int x, int y) const { return field_info[y][x]; }
     CellState GetCellState(int x, int y) const { return field_state[y][x]; }
 
 private:
-    OpeningResult OpenNearbyCells(int x, int y);
+    OpeningResult SubOpenCell(int x, int y);
 
     int CountNearbyFlags(int x, int y) const;
 };
 
-SapperField::SapperField(int width, int height, int bombs_amount)
+SapperField::SapperField(int width, int height, int bombs_number)
 {
     int i, j;
 
+    flags_amount = 0;
+    bombs_amount = bombs_number;
     field_width = width;
     field_height = height;
 
@@ -71,7 +76,7 @@ SapperField::SapperField(int width, int height, int bombs_amount)
     }
 
     int x, y;
-    for (i = 0; i < bombs_amount; i++) {
+    for (i = 0; i < bombs_number; i++) {
         do {
             x = rand() % width;
             y = rand() % height;
@@ -132,6 +137,16 @@ void SapperField::DrawCellState(int x, int y) const
     attroff(COLOR_PAIR(kCellStateColorPairID[field_state[y][x]]));
 }
 
+void SapperField::DrawAllBombs() const
+{
+    for (int y = 0; y < field_height; y++) {
+        for (int x = 0; x < field_width; x++) {
+            if (field_info[y][x] == CELL_BOMB)
+                DrawCell(x, y);
+        }
+    }
+}
+
 int SapperField::CountNearbyFlags(int x, int y) const
 {
     int n = 0;
@@ -160,7 +175,21 @@ int SapperField::CountNearbyFlags(int x, int y) const
     return n;
 }
 
-OpeningResult SapperField::OpenNearbyCells(int x, int y) { return O_UNSUCCESS; }
+OpeningResult SapperField::SubOpenCell(int x, int y)
+{
+    if (x < 0 || x >= field_width || y < 0 || y >= field_height)
+        return O_UNSUCCESS;
+
+    if (field_state[y][x] == CELL_CLOSED) {
+        field_state[y][x] = CELL_OPENED;
+        DrawCell(x, y);
+        if (field_info[y][x] == CELL_BOMB)
+            return O_EXPLOSION;
+        return O_SUCCESS;
+    }
+
+    return O_UNSUCCESS;
+}
 
 OpeningResult SapperField::OpenCell(int x, int y)
 {
@@ -170,24 +199,24 @@ OpeningResult SapperField::OpenCell(int x, int y)
 
     if (field_state[y][x] == CELL_OPENED) {
         if (field_info[y][x] == CELL_EMPTY) {
-            DrawCell(x, y);
+            // DrawCell(x, y);
         }
         else {
             if (CountNearbyFlags(x, y) == field_info[y][x]) {
-                explosion_flag += OpenCell(x - 1, y) == O_EXPLOSION;
-                explosion_flag += OpenCell(x - 1, y - 1) == O_EXPLOSION;
-                explosion_flag += OpenCell(x - 1, y + 1) == O_EXPLOSION;
-                explosion_flag += OpenCell(x + 1, y) == O_EXPLOSION;
-                explosion_flag += OpenCell(x + 1, y - 1) == O_EXPLOSION;
-                explosion_flag += OpenCell(x + 1, y + 1) == O_EXPLOSION;
-                explosion_flag += OpenCell(x, y - 1) == O_EXPLOSION;
-                explosion_flag += OpenCell(x, y + 1) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x - 1, y) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x - 1, y - 1) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x - 1, y + 1) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x + 1, y) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x + 1, y - 1) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x + 1, y + 1) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x, y - 1) == O_EXPLOSION;
+                explosion_flag += SubOpenCell(x, y + 1) == O_EXPLOSION;
                 if (explosion_flag)
                     return O_EXPLOSION;
             }
         }
     }
-    else if (field_state[y][x] != CELL_FLAGGED) {
+    else if (field_state[y][x] == CELL_CLOSED) {
         field_state[y][x] = CELL_OPENED;
 
         DrawCell(x, y);
@@ -218,10 +247,12 @@ void SapperField::FlagCell(int x, int y)
 {
     if (field_state[y][x] == CELL_CLOSED) {
         field_state[y][x] = CELL_FLAGGED;
+        flags_amount++;
         DrawCellState(x, y);
     }
     else if (field_state[y][x] == CELL_FLAGGED) {
         field_state[y][x] = CELL_CLOSED;
+        flags_amount--;
         DrawCellState(x, y);
     }
     fprintf(gLog, "[%02d][%02d] flagged\n", x, y);
@@ -229,13 +260,17 @@ void SapperField::FlagCell(int x, int y)
 
 void GameOver()
 {
+    int key;
     attrset(COLOR_PAIR(CELL_NEAR_FIVE));
     mvprintw(getmaxy(stdscr) / 2, (getmaxx(stdscr) - 8) / 2, "GameOver");
     attroff(COLOR_PAIR(CELL_NEAR_FIVE));
     refresh();
-    napms(1000);
-    endwin();
-    exit(0);
+    notimeout(stdscr, false);
+    key = getch();
+    if (key == kKeyEscape) {
+        endwin();
+        exit(0);
+    }
 }
 
 void colorinit()
@@ -260,7 +295,6 @@ void ncinit()
     noecho();
     cbreak();
     curs_set(false);
-    intrflush(stdscr, false);
     keypad(stdscr, true);
     mouseinterval(0);
 
@@ -306,25 +340,32 @@ int main(int argc, char **argv)
     OpeningResult op_res;
     MEVENT mouse_event;
 
-    SapperField game_sapper_field(getmaxx(stdscr), getmaxy(stdscr),
-                                  bombs_amount);
+    // SapperField game(getmaxx(stdscr), getmaxy(stdscr), bombs_amount);
+    SapperField *game;
+    game = new SapperField(getmaxx(stdscr), getmaxy(stdscr), bombs_amount);
 
     while ((key = getch()) != kKeyEscape) {
         switch (key) {
         case KEY_MOUSE:
             if (getmouse(&mouse_event) == OK) {
                 if (mouse_event.bstate & BUTTON1_PRESSED) {
-                    op_res = game_sapper_field.OpenCell(mouse_event.x,
-                                                        mouse_event.y);
-                    if (op_res == O_EXPLOSION)
+                    op_res = game->OpenCell(mouse_event.x, mouse_event.y);
+                    if (op_res == O_EXPLOSION) {
+                        game->DrawAllBombs();
                         GameOver();
+                    }
                     fprintf(gLog, "Opening result: %d\n", op_res);
                 }
                 else if (mouse_event.bstate & BUTTON3_PRESSED) {
-                    game_sapper_field.FlagCell(mouse_event.x, mouse_event.y);
+                    game->FlagCell(mouse_event.x, mouse_event.y);
                 }
             }
             refresh();
+            break;
+        case kKeyRestart:
+            delete game;
+            game = new SapperField(getmaxx(stdscr), getmaxy(stdscr), bombs_amount);
+            break;
         }
     }
 
