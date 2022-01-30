@@ -25,7 +25,7 @@ const int kKeyRestart = 'r';
 const int kCellColorPairID[10] = {12, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 const char kCellChar[10] = {' ', '1', '2', '3', '4', '5', '6', '7', '8', '*'};
 const int kCellStateColorPairID[3] = {10, 11, 12};
-const int kCellStateChar[3] = {' ', '?', ' '};
+const int kCellStateChar[3] = {'#', '?', ' '};
 const char kGameResultMsg[2][9] = {"GameOver", "You Win!"};
 
 class SapperField {
@@ -45,8 +45,6 @@ public:
     void DrawCellState(int x, int y) const;
     void DrawAllBombs() const;
     bool CheckWinCondition() const { return bflags_amount == bombs_amount; };
-    CellInfo GetCellInfo(int x, int y) const { return field_info[y][x]; }
-    CellState GetCellState(int x, int y) const { return field_state[y][x]; }
 
     void FieldToFile();
 
@@ -124,16 +122,16 @@ SapperField::~SapperField()
 
 void SapperField::DrawCell(int x, int y) const
 {
-    attrset(COLOR_PAIR(kCellColorPairID[field_info[y][x]]));
+    attrset(COLOR_PAIR(kCellColorPairID[field_info[y][x]]) | A_BOLD);
     mvaddch(y, x, kCellChar[field_info[y][x]]);
-    attroff(COLOR_PAIR(kCellColorPairID[field_info[y][x]]));
+    attroff(COLOR_PAIR(kCellColorPairID[field_info[y][x]]) | A_BOLD);
 }
 
 void SapperField::DrawCellState(int x, int y) const
 {
-    attrset(COLOR_PAIR(kCellStateColorPairID[field_state[y][x]]));
+    attrset(COLOR_PAIR(kCellStateColorPairID[field_state[y][x]]) | A_BOLD);
     mvaddch(y, x, kCellStateChar[field_state[y][x]]);
-    attroff(COLOR_PAIR(kCellStateColorPairID[field_state[y][x]]));
+    attroff(COLOR_PAIR(kCellStateColorPairID[field_state[y][x]]) | A_BOLD);
 }
 
 void SapperField::DrawAllBombs() const
@@ -351,11 +349,9 @@ int main(int argc, char **argv)
 
     ncinit();
 
-    if (bombs_amount >= getmaxx(stdscr)*getmaxy(stdscr)) {
+    if (bombs_amount >= getmaxx(stdscr) * getmaxy(stdscr)) {
         endwin();
-        fprintf(
-                stderr,
-                "Error: Bombs everywhere O_O\n");
+        fprintf(stderr, "Error: Bombs everywhere O_O\n");
         return 1;
     }
 
