@@ -44,7 +44,7 @@ public:
     void DrawCell(int x, int y) const;
     void DrawCellState(int x, int y) const;
     void DrawAllBombs() const;
-    bool CheckWinCondition() const { return bflags_amount == bombs_amount; };
+    bool CheckWinCondition() const { return (bflags_amount == bombs_amount) && (flags_amount == bflags_amount); };
 
     void FieldToFile();
 
