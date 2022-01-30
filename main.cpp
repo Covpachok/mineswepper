@@ -32,7 +32,7 @@ class SapperField {
     CellInfo **field_info;
     CellState **field_state;
     int field_width, field_height;
-    int flags_amount, bombs_amount, bflags_amount;
+    int flags_amount, bflags_amount, bombs_amount;
 
 public:
     SapperField(int width, int height, int bombs_number);
@@ -48,6 +48,8 @@ public:
     CellInfo GetCellInfo(int x, int y) const { return field_info[y][x]; }
     CellState GetCellState(int x, int y) const { return field_state[y][x]; }
 
+    void FieldToFile();
+
 private:
     OpeningResult SubOpenCell(int x, int y);
 
@@ -55,14 +57,10 @@ private:
 };
 
 SapperField::SapperField(int width, int height, int bombs_number)
+    : field_width(width), field_height(height), flags_amount(0),
+      bflags_amount(0), bombs_amount(bombs_number)
 {
     int i, j;
-
-    flags_amount = 0;
-    bflags_amount = 0;
-    bombs_amount = bombs_number;
-    field_width = width;
-    field_height = height;
 
     field_info = new CellInfo *[height];
     field_state = new CellState *[height];
@@ -183,7 +181,17 @@ OpeningResult SapperField::SubOpenCell(int x, int y)
     if (field_state[y][x] == CELL_CLOSED) {
         field_state[y][x] = CELL_OPENED;
         DrawCell(x, y);
-        if (field_info[y][x] == CELL_BOMB)
+        if (field_info[y][x] == CELL_EMPTY) {
+            SubOpenCell(x - 1, y);
+            SubOpenCell(x - 1, y - 1);
+            SubOpenCell(x - 1, y + 1);
+            SubOpenCell(x + 1, y);
+            SubOpenCell(x + 1, y - 1);
+            SubOpenCell(x + 1, y + 1);
+            SubOpenCell(x, y - 1);
+            SubOpenCell(x, y + 1);
+        }
+        else if (field_info[y][x] == CELL_BOMB)
             return O_EXPLOSION;
         return O_SUCCESS;
     }
@@ -261,21 +269,32 @@ void SapperField::FlagCell(int x, int y)
     }
 }
 
+void SapperField::FieldToFile()
+{
+    FILE *f;
+    f = fopen("field.txt", "w");
+    if (!f) {
+        perror("field.txt");
+        return;
+    }
+
+    for (int i = 0; i < field_height; i++) {
+        for (int j = 0; j < field_width; j++)
+            fprintf(f, "%c ", kCellChar[field_info[i][j]]);
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+}
+
 void GameOver(bool status)
 {
-    int key;
     attrset(COLOR_PAIR(CELL_NEAR_FIVE));
     mvprintw(getmaxy(stdscr) / 2, (getmaxx(stdscr) - 8) / 2, "%s",
              kGameResultMsg[status]);
     attroff(COLOR_PAIR(CELL_NEAR_FIVE));
     refresh();
-    napms(100);
-    getch();
-    key = getch();
-    if (key == kKeyEscape) {
-        endwin();
-        exit(0);
-    }
+    napms(1000);
 }
 
 void colorinit()
@@ -332,42 +351,60 @@ int main(int argc, char **argv)
 
     ncinit();
 
+    if (bombs_amount >= getmaxx(stdscr)*getmaxy(stdscr)) {
+        endwin();
+        fprintf(
+                stderr,
+                "Error: Bombs everywhere O_O\n");
+        return 1;
+    }
+
+    bool game_over = false;
     int key;
     OpeningResult op_res;
     MEVENT mouse_event;
 
-    // SapperField game(getmaxx(stdscr), getmaxy(stdscr), bombs_amount);
     SapperField *game;
     game = new SapperField(getmaxx(stdscr), getmaxy(stdscr), bombs_amount);
 
     while ((key = getch()) != kKeyEscape) {
         switch (key) {
+
         case KEY_MOUSE:
             if (getmouse(&mouse_event) == OK) {
                 if (mouse_event.bstate & BUTTON1_PRESSED) {
                     op_res = game->OpenCell(mouse_event.x, mouse_event.y);
                     if (op_res == O_EXPLOSION) {
                         game->DrawAllBombs();
+                        game_over = true;
                         GameOver(LOSE);
                     }
                 }
                 else if (mouse_event.bstate & BUTTON3_PRESSED) {
                     game->FlagCell(mouse_event.x, mouse_event.y);
-                }
-                if (game->CheckWinCondition()) {
-                    GameOver(WIN);
-                    delete game;
-                    game = new SapperField(getmaxx(stdscr), getmaxy(stdscr),
-                                           bombs_amount);
+                    if (game->CheckWinCondition()) {
+                        game_over = true;
+                        GameOver(WIN);
+                    }
                 }
             }
             refresh();
             break;
+
         case kKeyRestart:
+            game_over = true;
+            break;
+
+        case 'w':
+            game->FieldToFile();
+            break;
+        }
+
+        if (game_over) {
+            game_over = false;
             delete game;
             game =
                 new SapperField(getmaxx(stdscr), getmaxy(stdscr), bombs_amount);
-            break;
         }
     }
 
