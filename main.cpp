@@ -146,7 +146,6 @@ OpeningResult SapperField::OpenCell(int x, int y, bool sub_open)
         field_state[y][x] = CELL_OPENED;
         opened_cells_count++;
         DrawCell(x, y);
-        mvprintw(0, 0, "%05d", opened_cells_count);
 
         if (field_info[y][x] != CELL_BOMB) {
             if (field_info[y][x] == CELL_EMPTY) {
