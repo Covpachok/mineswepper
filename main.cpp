@@ -14,10 +14,9 @@ enum CellInfo {
     CELL_NEAR_EIGHT,
     CELL_BOMB,
 };
-
-enum { LOSE, WIN };
 enum CellState { CELL_CLOSED, CELL_FLAGGED, CELL_OPENED };
 enum OpeningResult { O_UNSUCCESS, O_SUCCESS, O_EXPLOSION };
+enum { LOSE, WIN };
 
 const int kKeyEscape = 'q';
 const int kKeyRestart = 'r';
@@ -31,7 +30,7 @@ class SapperField {
     CellInfo **field_info;
     CellState **field_state;
     int field_width, field_height;
-    int flags_amount, bflags_amount, bombs_amount;
+    int flags_amount, bombs_amount;
     int opened_cells_count;
 
 public:
@@ -52,7 +51,7 @@ private:
 
 SapperField::SapperField(int width, int height, int bombs_number)
     : field_width(width), field_height(height), flags_amount(0),
-      bflags_amount(0), bombs_amount(bombs_number), opened_cells_count(0)
+      bombs_amount(bombs_number), opened_cells_count(0)
 {
     int i, j;
 
@@ -122,7 +121,7 @@ SapperField::~SapperField()
 
 OpeningResult SapperField::OpenCell(int x, int y, bool sub_open)
 {
-    int explosion_flag = false;
+    int explosion_flag = 0;
     if (x < 0 || x >= field_width || y < 0 || y >= field_height)
         return O_UNSUCCESS;
 
@@ -174,15 +173,11 @@ void SapperField::FlagCell(int x, int y)
 {
     if (field_state[y][x] == CELL_CLOSED) {
         field_state[y][x] = CELL_FLAGGED;
-        if (field_info[y][x] == CELL_BOMB)
-            bflags_amount++;
         flags_amount++;
         DrawCellState(x, y);
     }
     else if (field_state[y][x] == CELL_FLAGGED) {
         field_state[y][x] = CELL_CLOSED;
-        if (field_info[y][x] == CELL_BOMB)
-            bflags_amount--;
         flags_amount--;
         DrawCellState(x, y);
     }
@@ -214,7 +209,7 @@ void SapperField::DrawAllBombs() const
 
 bool SapperField::CheckWinCondition() const
 {
-    return (bflags_amount == bombs_amount) && (flags_amount == bflags_amount) &&
+    return (flags_amount == bombs_amount) &&
            (opened_cells_count == (field_width * field_height) - bombs_amount);
 }
 
@@ -328,7 +323,7 @@ int main(int argc, char **argv)
 
         case KEY_MOUSE:
             if (getmouse(&mouse_event) == OK) {
-                if (mouse_event.bstate & BUTTON1_PRESSED) {
+                if (mouse_event.bstate & BUTTON1_RELEASED) {
                     op_res =
                         game->OpenCell(mouse_event.x, mouse_event.y, false);
                     if (op_res == O_EXPLOSION) {
