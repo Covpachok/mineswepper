@@ -44,7 +44,11 @@ public:
     void DrawCell(int x, int y) const;
     void DrawCellState(int x, int y) const;
     void DrawAllBombs() const;
-    bool CheckWinCondition() const { return (bflags_amount == bombs_amount) && (flags_amount == bflags_amount); };
+    bool CheckWinCondition() const
+    {
+        return (bflags_amount == bombs_amount) &&
+               (flags_amount == bflags_amount);
+    };
 
     void FieldToFile();
 
@@ -116,6 +120,10 @@ SapperField::SapperField(int width, int height, int bombs_number)
 
 SapperField::~SapperField()
 {
+    for (int i = 0; i < field_height; i++) {
+        delete[] field_info[i];
+        delete[] field_state[i];
+    }
     delete[] field_info;
     delete[] field_state;
 }
