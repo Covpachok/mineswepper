@@ -37,7 +37,7 @@ public:
     SapperField(int width, int height, int bombs_number);
     ~SapperField();
 
-    OpeningResult OpenCell(int x, int y, bool sub_open);
+    OpeningResult OpenCell(int x, int y, bool sub_open = false);
     void FlagCell(int x, int y);
 
     void DrawCell(int x, int y) const;
@@ -148,14 +148,14 @@ OpeningResult SapperField::OpenCell(int x, int y, bool sub_open)
 
         if (field_info[y][x] != CELL_BOMB) {
             if (field_info[y][x] == CELL_EMPTY) {
-                OpenCell(x - 1, y, false);
-                OpenCell(x - 1, y - 1, false);
-                OpenCell(x - 1, y + 1, false);
-                OpenCell(x + 1, y, false);
-                OpenCell(x + 1, y - 1, false);
-                OpenCell(x + 1, y + 1, false);
-                OpenCell(x, y - 1, false);
-                OpenCell(x, y + 1, false);
+                OpenCell(x - 1, y);
+                OpenCell(x - 1, y - 1);
+                OpenCell(x - 1, y + 1);
+                OpenCell(x + 1, y);
+                OpenCell(x + 1, y - 1);
+                OpenCell(x + 1, y + 1);
+                OpenCell(x, y - 1);
+                OpenCell(x, y + 1);
             }
         }
         else {
@@ -295,7 +295,7 @@ int main(int argc, char **argv)
 
     int bombs_amount = atoi(argv[1]);
 
-    if (bombs_amount == 0) {
+    if (bombs_amount <= 0) {
         fprintf(
             stderr,
             "Error: Invalid argument, positive non-zero number expected.\n");
@@ -324,8 +324,7 @@ int main(int argc, char **argv)
         case KEY_MOUSE:
             if (getmouse(&mouse_event) == OK) {
                 if (mouse_event.bstate & BUTTON1_RELEASED) {
-                    op_res =
-                        game->OpenCell(mouse_event.x, mouse_event.y, false);
+                    op_res = game->OpenCell(mouse_event.x, mouse_event.y);
                     if (op_res == O_EXPLOSION) {
                         game->DrawAllBombs();
                         game_over = true;
