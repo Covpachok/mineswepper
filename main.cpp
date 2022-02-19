@@ -80,6 +80,9 @@ SapperField::~SapperField()
 
 void SapperField::FillField()
 {
+    flags_amount = 0;
+    opened_cells_count = 0;
+
     int i, j;
 
     for (i = 0; i < field_height; i++) {
